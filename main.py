@@ -15,6 +15,8 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QHBoxLayout, QVBoxLayout,
                              QPushButton, QLabel, QFileDialog, QTabWidget, QFrame)
 from PyQt5.QtCore import Qt
 
+from przegladarkaobrazow import PrzegladarkaObrazow
+
 from ekspozycja import Ekspozycja
 from filtry import Filtry
 
@@ -47,23 +49,30 @@ class MainWindow(QWidget):
         
         self.main_layout.addWidget(frame, stretch=1)
 
-    def setup_center_panel(self):
+    def setup_center_panel(self):   
         center_layout = QVBoxLayout()
 
-        self.image_figure = Figure(figsize=(6, 6), dpi=100)
-        self.image_canvas = FigureCanvas(self.image_figure)
-        self.image_ax = self.image_figure.add_subplot(111)
-        self.image_ax.axis('off')
-        
-        self.toolbar = NavigationToolbar(self.image_canvas, self)
+        # Używamy naszej nowej, interaktywnej przeglądarki!
+        self.przegladarka = PrzegladarkaObrazow()
 
+        # Przycisk wczytywania
         self.btn_load = QPushButton("Wczytaj zdjęcie z dysku")
         self.btn_load.setMinimumHeight(40)
         self.btn_load.clicked.connect(self.load_image_dialog)
 
-        center_layout.addWidget(self.toolbar)
-        center_layout.addWidget(self.image_canvas)
-        center_layout.addWidget(self.btn_load)
+        # NOWOŚĆ: Przycisk Zapisu (na ocenę 4.0)
+        self.btn_save = QPushButton("Zapisz przetworzony obraz")
+        self.btn_save.setMinimumHeight(40)
+        self.btn_save.clicked.connect(lambda: self.przegladarka.zapisz_obraz(self))
+
+        center_layout.addWidget(self.przegladarka)
+        
+        # Układ poziomy dla przycisków pod obrazkiem
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.btn_load)
+        btn_layout.addWidget(self.btn_save)
+        
+        center_layout.addLayout(btn_layout)
 
         self.main_layout.addLayout(center_layout, stretch=3)
 
@@ -108,11 +117,13 @@ class MainWindow(QWidget):
         img = self.tab_ekspozycja.return_processed_image(img)
         img = self.tab_filtry.return_processed_image(img)
 
+
+        self.przegladarka.wyswietl_obraz_numpy(img)
         # 3. Wyświetlenie
-        self.image_ax.clear()
-        self.image_ax.imshow(img)
-        self.image_ax.axis('off')
-        self.image_canvas.draw()
+        # self.image_ax.clear()
+        # self.image_ax.imshow(img)
+        # self.image_ax.axis('off')
+        # self.image_canvas.draw()
 
         # TODO: Tutaj w przyszłości wywołasz funkcję:
         # self.calculate_and_draw_histogram(self.current_image)
