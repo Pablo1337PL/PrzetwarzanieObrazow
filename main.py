@@ -4,21 +4,21 @@ import matplotlib
 
 matplotlib.use('Qt5Agg')
 
-import matplotlib.pyplot as plt
+
 import matplotlib.image as mpimg
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
-
 from PyQt5.QtWidgets import (QApplication, QWidget, QHBoxLayout, QVBoxLayout, 
-                             QPushButton, QLabel, QFileDialog, QTabWidget, QFrame)
+                             QPushButton, QLabel, QFileDialog, QTabWidget, QFrame,
+                             QGridLayout, QCheckBox)
 from PyQt5.QtCore import Qt
 
 from przegladarkaobrazow import PrzegladarkaObrazow
 
 from ekspozycja import Ekspozycja
 from filtry import Filtry
+
+from histogram import Histogram
+from projekcje import ProjekcjaGorna, ProjekcjaBoczna
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -34,47 +34,98 @@ class MainWindow(QWidget):
 
     def setup_left_panel(self):
         left_layout = QVBoxLayout()
-        self.hist_figure = Figure(figsize=(3, 4), dpi=100)
-        self.hist_canvas = FigureCanvas(self.hist_figure)
-        self.hist_ax = self.hist_figure.add_subplot(111)
-        self.hist_ax.set_title("Histogram")
-        self.hist_ax.grid(True, alpha=0.3)
+        left_layout.setAlignment(Qt.AlignTop) # Trzyma elementy blisko góry
+        
+        # 1. Histogram
+        self.histogram = Histogram()
+        left_layout.addWidget(self.histogram)
+        
+        # 2. Opcje projekcji
+        left_layout.addWidget(QLabel("<b>Sterowanie Projekcjami:</b>"))
+        
+        self.chk_proj_gora = QCheckBox("Włącz górną projekcję")
+        self.chk_proj_gora.setChecked(False)
+        self.chk_proj_gora.toggled.connect(self.toggle_projections)
+        
+        self.chk_proj_lewo = QCheckBox("Włącz boczną projekcję")
+        self.chk_proj_lewo.setChecked(False)
+        self.chk_proj_lewo.toggled.connect(self.toggle_projections)
 
-        left_layout.addWidget(QLabel("<b>Analiza:</b>"))
-        left_layout.addWidget(self.hist_canvas)
+        self.chk_proj_rgb = QCheckBox("Projekcje w kolorach RGB")
+        self.chk_proj_rgb.setChecked(False)
+        # Zmiana trybu RGB odświeża od razu widok
+        self.chk_proj_rgb.toggled.connect(self.update_image_pipeline) 
+
+        left_layout.addWidget(self.chk_proj_gora)
+        left_layout.addWidget(self.chk_proj_lewo)
+        left_layout.addWidget(self.chk_proj_rgb)
         
         frame = QFrame()
         frame.setLayout(left_layout)
-        frame.setFrameShape(QFrame.Shape.StyledPanel)
+        frame.setFrameShape(QFrame.StyledPanel)
+        
+        self.main_layout.addWidget(frame, stretch=1)
         
         self.main_layout.addWidget(frame, stretch=1)
 
     def setup_center_panel(self):   
         center_layout = QVBoxLayout()
 
-        # Używamy naszej nowej, interaktywnej przeglądarki!
+        # --- SIATKA (GRID) DLA OBRAZU I PROJEKCJI ---
+        self.grid = QGridLayout()
+        self.grid.setSpacing(0) 
+
+        self.proj_gora = ProjekcjaGorna()
+        self.proj_boczna = ProjekcjaBoczna()
         self.przegladarka = PrzegladarkaObrazow()
 
-        # Przycisk wczytywania
-        self.btn_load = QPushButton("Wczytaj zdjęcie z dysku")
-        self.btn_load.setMinimumHeight(40)
-        self.btn_load.clicked.connect(self.load_image_dialog)
+        self.grid.addWidget(self.proj_gora, 0, 1)   
+        self.grid.addWidget(self.proj_boczna, 1, 0) 
+        self.grid.addWidget(self.przegladarka, 1, 1)
 
-        # NOWOŚĆ: Przycisk Zapisu (na ocenę 4.0)
-        self.btn_save = QPushButton("Zapisz przetworzony obraz")
-        self.btn_save.setMinimumHeight(40)
+        self.grid.setColumnStretch(1, 1)
+        self.grid.setRowStretch(1, 1)
+
+        # Na starcie aplikujemy stany z checkboxów (ukrywamy projekcje)
+        self.toggle_projections()
+
+        center_layout.addLayout(self.grid)
+
+        # --- NASŁUCHIWANIE RUCHU MYSZKĄ ---
+        self.przegladarka.pixel_hovered.connect(self.on_pixel_hovered)
+        # --- NASŁUCHIWANIE RUCHU I ZMIANY WIDOKU ---
+        self.przegladarka.pixel_hovered.connect(self.on_pixel_hovered)
+        self.przegladarka.visible_rect_changed.connect(self.update_projections_from_rect)
+
+
+        # --- PRZYCISKI PLIKÓW ---
+        self.btn_load = QPushButton("Wczytaj zdjęcie")
+        self.btn_load.clicked.connect(self.load_image_dialog)
+        self.btn_save = QPushButton("Zapisz obraz")
         self.btn_save.clicked.connect(lambda: self.przegladarka.zapisz_obraz(self))
 
-        center_layout.addWidget(self.przegladarka)
-        
-        # Układ poziomy dla przycisków pod obrazkiem
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(self.btn_load)
         btn_layout.addWidget(self.btn_save)
-        
         center_layout.addLayout(btn_layout)
 
         self.main_layout.addLayout(center_layout, stretch=3)
+
+    
+    # NOWA FUNKCJA - Włączanie/wyłączanie wykresów
+    def toggle_projections(self):
+        """Pokazuje/ukrywa projekcje, dynamicznie zwalniając miejsce na ekranie."""
+        self.proj_gora.setVisible(self.chk_proj_gora.isChecked())
+        self.proj_boczna.setVisible(self.chk_proj_lewo.isChecked())
+
+    # NOWA FUNKCJA - Przesuwanie linii na wykresach
+    def on_pixel_hovered(self, x, y, piksel):
+        # Przekazujemy całą tablicę [R, G, B] prosto do histogramu
+        self.histogram.set_cursor(piksel) 
+        if self.chk_proj_gora.isChecked():
+            self.proj_gora.set_cursor(x)
+        if self.chk_proj_lewo.isChecked():
+            self.proj_boczna.set_cursor(y)
 
     def setup_right_panel(self):
         self.tabs = QTabWidget()
@@ -117,16 +168,44 @@ class MainWindow(QWidget):
         img = self.tab_ekspozycja.return_processed_image(img)
         img = self.tab_filtry.return_processed_image(img)
 
+        self.current_processed_image = img
 
         self.przegladarka.wyswietl_obraz_numpy(img)
-        # 3. Wyświetlenie
-        # self.image_ax.clear()
-        # self.image_ax.imshow(img)
-        # self.image_ax.axis('off')
-        # self.image_canvas.draw()
 
-        # TODO: Tutaj w przyszłości wywołasz funkcję:
-        # self.calculate_and_draw_histogram(self.current_image)
+        self.histogram.update_histogram(img)
+
+    def update_projections_from_rect(self, x, y, w, h):
+        """Odbiera koordynaty z przeglądarki i aktualizuje projekcje tylko dla widocznego fragmentu."""
+        if not hasattr(self, 'current_processed_image') or self.current_processed_image is None:
+            return
+            
+        # Zapisujemy koordynaty wycięcia, aby poprawić wskaźnik kursora
+        self.current_crop_x = x
+        self.current_crop_y = y
+
+        # Magia NumPy: wycinamy błyskawicznie tylko widoczny obszar
+        widoczny_fragment = self.current_processed_image[y:y+h, x:x+w]
+        tryb_rgb = self.chk_proj_rgb.isChecked()
+
+        # Aktualizujemy wykresy (dla optymalizacji - tylko te, które są widoczne)
+        if self.chk_proj_gora.isChecked():
+            self.proj_gora.update_plot(widoczny_fragment, rgb_mode=tryb_rgb)
+        if self.chk_proj_lewo.isChecked():
+            self.proj_boczna.update_plot(widoczny_fragment, rgb_mode=tryb_rgb)
+
+    def on_pixel_hovered(self, x, y, piksel):
+        self.histogram.set_cursor(piksel)
+        
+        # Kursor myszki podaje bezwzględną pozycję piksela (np. x=1500)
+        # Ale nasz wykres wyświetla tylko wycinek od x=1000. 
+        # Zatem dla wykresu kursor jest na pozycji 500.
+        rel_x = x - getattr(self, 'current_crop_x', 0)
+        rel_y = y - getattr(self, 'current_crop_y', 0)
+
+        if self.chk_proj_gora.isChecked():
+            self.proj_gora.set_cursor(rel_x)
+        if self.chk_proj_lewo.isChecked():
+            self.proj_boczna.set_cursor(rel_y)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

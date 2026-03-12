@@ -1,93 +1,94 @@
 import numpy as np
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QFileDialog, QMessageBox
-from PyQt5.QtGui import QImage, QPixmap, QTransform
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import Qt, pyqtSignal
 
 class PrzegladarkaObrazow(QGraphicsView):
+    pixel_hovered = pyqtSignal(int, int, object)
+    
+    # NOWY SYGNAŁ: Wysyła parametry widocznego okna (x, y, szerokość, wysokość)
+    visible_rect_changed = pyqtSignal(int, int, int, int)
+
     def __init__(self):
         super().__init__()
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
-        
-        # Włączenie łapania i przesuwania obrazka (Pan)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
-        
-        # Ukrycie pasków przewijania dla lepszego wyglądu
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
+        
         self.obecny_pixmap = None
-        self.obecny_obraz_numpy = None # Przechowujemy też oryginalną tablicę do zapisu
+        self.obecny_obraz_numpy = None
+
+        # Kiedy przesuwamy obrazek (Pan), paski przewijania zmieniają wartość.
+        # Łapiemy to i przeliczamy widoczny obszar!
+        self.horizontalScrollBar().valueChanged.connect(self.emit_visible_rect)
+        self.verticalScrollBar().valueChanged.connect(self.emit_visible_rect)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.emit_visible_rect() # Aktualizacja przy zmianie rozmiaru okna
 
     def wheelEvent(self, event):
-        """Obsługa przybliżania/oddalania (Zoom) rolką myszy."""
+        """Obsługa przybliżania/oddalania (Zoom)."""
         if self.obecny_pixmap is None:
             return
 
-        # Krok powiększenia
         zoom_in_factor = 1.15
         zoom_out_factor = 1 / zoom_in_factor
+        zoom_factor = zoom_in_factor if event.angleDelta().y() > 0 else zoom_out_factor
 
-        # Sprawdzamy, w którą stronę kręci się rolka
-        if event.angleDelta().y() > 0:
-            zoom_factor = zoom_in_factor
-        else:
-            zoom_factor = zoom_out_factor
-
-        # Skalowanie widoku
         self.scale(zoom_factor, zoom_factor)
+        
+        # Po zoomie, wyślij nowe kordynaty widocznego obszaru
+        self.emit_visible_rect()
 
     def wyswietl_obraz_numpy(self, img_array):
-        """Konwertuje tablicę NumPy na QPixmap i wyświetla (zabezpieczone przed błędami pamięci)."""
-        # 1. Zabezpieczenie: upewniamy się, że tablica jest w ciągłym bloku pamięci C
         img_array = np.ascontiguousarray(img_array)
         self.obecny_obraz_numpy = img_array
         
         height, width, channel = img_array.shape
         bytes_per_line = 3 * width
         
-        # 2. Tworzymy QImage z pamięci
         q_img = QImage(img_array.data, width, height, bytes_per_line, QImage.Format_RGB888)
-        
-        # 3. Zabezpieczenie: Robimy .copy(), aby Qt wzięło pamięć na własność!
         self.obecny_pixmap = QPixmap.fromImage(q_img.copy())
         
         self.scene.clear()
         self.scene.addPixmap(self.obecny_pixmap)
         self.setSceneRect(self.scene.itemsBoundingRect())
+        
+        # Wyślij sygnał od razu po załadowaniu nowego zdjęcia
+        self.emit_visible_rect()
 
-    def zapisz_obraz(self, parent_window):
-        """Bezpieczny zapis pliku z wymuszaniem poprawnego rozszerzenia."""
-        if self.obecny_pixmap is None:
+    def emit_visible_rect(self):
+        """Oblicza, jaki fragment obrazu widać aktualnie na ekranie."""
+        if self.obecny_pixmap is None or self.obecny_obraz_numpy is None:
             return
-
-        import os
-
-        # QFileDialog zwraca ścieżkę oraz użyty filtr
-        file_path, filtr_str = QFileDialog.getSaveFileName(
-            parent_window, 
-            "Zapisz obraz", 
-            "", 
-            "PNG (*.png);;JPEG (*.jpg *.jpeg);;BMP (*.bmp)"
-        )
-
-        if file_path:
-            # 1. Sprawdzamy, czy użytkownik wpisał rozszerzenie (np. .jpg)
-            _, ext = os.path.splitext(file_path)
             
-            # 2. Jeśli nie wpisał, dodajemy je ręcznie na podstawie wybranego filtra!
-            if not ext:
-                if "PNG" in filtr_str:
-                    file_path += ".png"
-                elif "JPEG" in filtr_str or "JPG" in filtr_str:
-                    file_path += ".jpg"
-                elif "BMP" in filtr_str:
-                    file_path += ".bmp"
+        # Pobieramy prostokąt z widoku i mapujemy go na koordynaty obrazka
+        rect = self.mapToScene(self.viewport().rect()).boundingRect()
+        img_rect = self.scene.itemsBoundingRect()
+        
+        # Ucinamy to, co wystaje poza obrazek (np. szare tło aplikacji)
+        rect = rect.intersected(img_rect)
 
-            # 3. Zapisujemy - teraz Qt dokładnie wie, w jakim formacie zapisać
-            sukces = self.obecny_pixmap.save(file_path)
+        x = int(max(0, rect.x()))
+        y = int(max(0, rect.y()))
+        w = int(max(1, min(self.obecny_obraz_numpy.shape[1] - x, rect.width())))
+        h = int(max(1, min(self.obecny_obraz_numpy.shape[0] - y, rect.height())))
+
+        self.visible_rect_changed.emit(x, y, w, h)
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self.obecny_obraz_numpy is not None:
+            pos = self.mapToScene(event.pos())
+            x, y = int(pos.x()), int(pos.y())
+            h, w = self.obecny_obraz_numpy.shape[:2]
             
-            if sukces:
-                QMessageBox.information(parent_window, "Sukces", f"Zapisano w:\n{file_path}")
-            else:
-                QMessageBox.critical(parent_window, "Błąd", f"Niestety, nie udało się zapisać pliku w:\n{file_path}")
+            if 0 <= x < w and 0 <= y < h:
+                pixel = self.obecny_obraz_numpy[y, x]
+                self.pixel_hovered.emit(x, y, pixel)
