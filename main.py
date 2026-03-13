@@ -153,6 +153,10 @@ class MainWindow(QWidget):
             if img.shape[-1] == 4:
                 img = img[..., :3]
 
+            if img.shape[1] > 1000:
+                skala = img.shape[1] // 800 # szybkie działanie
+                img = img[::skala, ::skala]
+
             self.original_image = img
             self.update_image_pipeline() # Odpalenie potoku
 
