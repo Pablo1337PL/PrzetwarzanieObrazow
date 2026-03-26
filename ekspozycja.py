@@ -68,18 +68,13 @@ class Ekspozycja(Zakladka):
         self.layout.addWidget(self.bin_label)
         self.layout.addWidget(self.bin_slider)
 
-        self.add_separator()
-
-        self.przed_po_cb = QCheckBox("Przed / Po")
-        self.przed_po_cb.setStyleSheet("font-weight: bold; color: #d93025; padding-top: 10px;")
-        self.przed_po_cb.toggled.connect(self.changed.emit)
-        self.layout.addWidget(self.przed_po_cb)
-
     def create_slider(self, min_val, max_val, default, connect_func):
         slider = QSlider(Qt.Horizontal)
         slider.setRange(min_val, max_val)
         slider.setValue(default)
         slider.valueChanged.connect(connect_func)
+        slider.sliderReleased.connect(self.changed.emit)
+        
         return slider
 
     def add_separator(self):
@@ -90,28 +85,25 @@ class Ekspozycja(Zakladka):
 
     def update_jasnosc(self):
         self.jasnosc_label.setText(f"Wartość: {self.jasnosc_slider.value()}")
-        self.changed.emit()
+        #self.changed.emit()
 
     def update_kontrast(self):
         self.kontrast_label.setText(f"Wartość: {self.kontrast_slider.value()}")
-        self.changed.emit()
+        #self.changed.emit()
 
     def update_saturacja(self):
         self.saturacja_label.setText(f"Wartość: {self.saturacja_slider.value()}")
-        self.changed.emit()
+        #self.changed.emit()
 
     def update_winieta(self):
         self.winieta_label.setText(f"Siła winiety: {self.winieta_slider.value()}%")
-        self.changed.emit()
+        #self.changed.emit()
 
     def update_bin(self):
         self.bin_label.setText(f"Próg odcięcia: {self.bin_slider.value()}")
-        self.changed.emit()
+        #self.changed.emit()
 
     def process(self, img):
-        if self.przed_po_cb.isChecked():
-            return img
-
         img_float = img.astype(np.float32)
 
         # 1. Odcienie szarości

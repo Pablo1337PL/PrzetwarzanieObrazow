@@ -1,73 +1,75 @@
 import numpy as np
-from PyQt5.QtWidgets import QVBoxLayout, QCheckBox, QLabel, QFrame, QSlider, QComboBox
+from numpy.lib.stride_tricks import sliding_window_view
+from PyQt5.QtWidgets import (QVBoxLayout, QCheckBox, QLabel, 
+                             QFrame, QSlider, QComboBox, QWidget)
 from PyQt5.QtCore import Qt
 
 from zakladka import Zakladka
+from ui_helper import UIHelper
 
 class Filtry(Zakladka):
     def __init__(self):
         super().__init__(tytul_modulu="WŁĄCZ MODUŁ FILTRÓW", kolor="#e42b2b")
-
-        # --- 2. FILTR UŚREDNIAJĄCY ---
+# --- 1. FILTR UŚREDNIAJĄCY / KONWOLUCJA ---
         self.blur_box = QFrame()
         self.blur_layout = QVBoxLayout(self.blur_box)
         self.blur_layout.setContentsMargins(0, 0, 0, 10) 
         
-        self.blur_cb = QCheckBox("Filtr Uśredniający")
-        self.blur_cb.toggled.connect(self.changed.emit)
-        self.blur_cb.toggled.connect(self.toggle_blur_params) 
+        self.blur_cb = UIHelper.create_checkbox("Filtr / Konwolucja", default_state=False, toggled_func=self.changed.emit)
         
-        self.blur_label = QLabel("Siła rozmycia (iteracje): 1")
-        self.blur_slider = QSlider(Qt.Horizontal)
-        self.blur_slider.setRange(1, 5) 
-        self.blur_slider.setValue(1)
-        self.blur_slider.setEnabled(False) 
-        self.blur_slider.valueChanged.connect(self.update_blur_label)
+        self.blur_label, self.blur_slider = UIHelper.create_labeled_slider(
+            "Siła (iteracje)", 1, 5, 1, release_func=self.changed.emit
+        )
+
+        # NOWOŚĆ: Wybór algorytmu
+        self.blur_combo = UIHelper.create_combo_box(
+            ["Uśredniający (Zwykły)", "Gaussa (Miękki)", "Własna macierz (Custom)"], 
+            changed_func=self.on_blur_mode_changed
+        )
         
+        # NOWOŚĆ: Siatka 3x3 na własne wagi
+        # Domyślnie wpisujemy wagi dla np. płaskorzeźby (Emboss)
+        domyslne_wagi = [-2, -1, 0, -1, 1, 1, 0, 1, 2] 
+        self.matrix_grid, self.matrix_inputs = UIHelper.create_3x3_matrix_input(
+            domyslne_wagi, text_changed_func=self.changed.emit
+        )
+        
+        # Zamykamy siatkę w dodatkowym widgecie, żeby łatwo ją chować/pokazywać
+        self.matrix_widget = QWidget()
+        self.matrix_widget.setLayout(self.matrix_grid)
+        self.matrix_widget.hide() # Domyślnie ukryta (bo domyślnie jest tryb Zwykły)
+
         self.blur_layout.addWidget(self.blur_cb)
+        self.blur_layout.addWidget(self.blur_combo)
         self.blur_layout.addWidget(self.blur_label)
         self.blur_layout.addWidget(self.blur_slider)
+        self.blur_layout.addWidget(self.matrix_widget)
         
-        # --- 3. FILTR WYOSTRZAJĄCY ---
+        # --- 2. FILTR WYOSTRZAJĄCY ---
         self.sharp_box = QFrame()
         self.sharp_layout = QVBoxLayout(self.sharp_box)
         self.sharp_layout.setContentsMargins(0, 0, 0, 10)
         
-        self.sharp_cb = QCheckBox("Filtr Wyostrzający")
-        self.sharp_cb.toggled.connect(self.changed.emit)
-        self.sharp_cb.toggled.connect(self.toggle_sharp_params)
-        
-        self.sharp_label = QLabel("Waga centralna (łagodność): 5")
-        self.sharp_slider = QSlider(Qt.Horizontal)
-        self.sharp_slider.setRange(5, 15) 
-        self.sharp_slider.setValue(5)
-        self.sharp_slider.setEnabled(False)
-        self.sharp_slider.valueChanged.connect(self.update_sharp_label)
+        self.sharp_cb = UIHelper.create_checkbox("Filtr Wyostrzający", default_state=False, toggled_func=self.changed.emit)
+        self.sharp_label, self.sharp_slider = UIHelper.create_labeled_slider(
+            "Waga centralna", 5, 15, 5, release_func=self.changed.emit
+        )
         
         self.sharp_layout.addWidget(self.sharp_cb)
         self.sharp_layout.addWidget(self.sharp_label)
         self.sharp_layout.addWidget(self.sharp_slider)
 
-        # --- 4. WYKRYWANIE KRAWĘDZI ---
+        # --- 3. WYKRYWANIE KRAWĘDZI ---
         self.edge_box = QFrame()
         self.edge_layout = QVBoxLayout(self.edge_box)
         self.edge_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.edge_cb = QCheckBox("Wykrywanie krawędzi")
-        self.edge_cb.toggled.connect(self.changed.emit)
-        self.edge_cb.toggled.connect(self.toggle_edge_params)
-
-        # NOWOŚĆ: Checkbox wymuszający szarość
-        self.edge_gray_cb = QCheckBox("Wymuś odcienie szarości")
-        self.edge_gray_cb.setChecked(True) # Dobra praktyka: domyślnie włączone
-        self.edge_gray_cb.setEnabled(False)
-        self.edge_gray_cb.toggled.connect(self.changed.emit)
-
-        self.edge_combo = QComboBox()
-        # NOWOŚĆ: Dodany algorytm Canny'ego
-        self.edge_combo.addItems(["Operator Sobela", "Krzyż Robertsa", "Algorytm Canny'ego (NumPy)"])
-        self.edge_combo.setEnabled(False) 
-        self.edge_combo.currentIndexChanged.connect(self.changed.emit)
+        self.edge_cb = UIHelper.create_checkbox("Wykrywanie krawędzi", default_state=False, toggled_func=self.changed.emit)
+        self.edge_gray_cb = UIHelper.create_checkbox("Wymuś odcienie szarości", default_state=True, toggled_func=self.changed.emit)
+        self.edge_combo = UIHelper.create_combo_box(
+            ["Operator Sobela", "Krzyż Robertsa", "Algorytm Canny'ego"], 
+            changed_func=self.changed.emit
+        )
 
         self.edge_layout.addWidget(self.edge_cb)
         self.edge_layout.addWidget(self.edge_gray_cb)
@@ -75,80 +77,105 @@ class Filtry(Zakladka):
 
         # --- DODANIE DO GŁÓWNEGO LAYOUTU ---
         self.layout.addWidget(self.blur_box)
-        
-        separator1 = QFrame()
-        separator1.setFrameShape(QFrame.HLine)
-        separator1.setStyleSheet("color: #cccccc;")
-        self.layout.addWidget(separator1)
-        
+        UIHelper.add_separator(self.layout)
         self.layout.addWidget(self.sharp_box)
-
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setStyleSheet("color: #cccccc;")
-        self.layout.addWidget(separator2)
-
+        UIHelper.add_separator(self.layout)
         self.layout.addWidget(self.edge_box)
 
     # --- FUNKCJE POMOCNICZE UI ---
-    def toggle_blur_params(self, checked):
-        self.blur_slider.setEnabled(checked)
 
-    def update_blur_label(self, value):
-        self.blur_label.setText(f"Siła rozmycia (iteracje): {value}")
+
+    def on_blur_mode_changed(self):
+        """Pokazuje siatkę 3x3 tylko wtedy, gdy wybrano tryb 'Własna macierz'."""
+        if self.blur_combo.currentText() == "Własna macierz (Custom)":
+            self.matrix_widget.show()
+            self.blur_slider.setEnabled(False) # Przy własnej masce nie powielamy iteracji (suwaka)
+        else:
+            self.matrix_widget.hide()
+            self.blur_slider.setEnabled(True)
         self.changed.emit()
 
-    def toggle_sharp_params(self, checked):
-        self.sharp_slider.setEnabled(checked)
-
-    def update_sharp_label(self, value):
-        self.sharp_label.setText(f"Waga centralna (łagodność): {value}")
-        self.changed.emit()
-
-    def toggle_edge_params(self, checked):
-        self.edge_gray_cb.setEnabled(checked)
-        self.edge_combo.setEnabled(checked)
-
-    # --- LOGIKA PRZETWARZANIA (RĘCZNE IMPLEMENTACJE) ---
-    def manual_convolve_3x3(self, img, kernel):
-        """Ręczna implementacja splotu dla obrazu 3-kanałowego (RGB)."""
-        k = np.array(kernel)
-        pad_img = np.pad(img, ((1, 1), (1, 1), (0, 0)), mode='edge')
-        output = np.zeros_like(img, dtype=np.float32)
-
+    def get_custom_kernel(self):
+        """Odczytuje wagi z 9 okienek tekstowych i zamienia na macierz 3x3."""
+        kernel = []
         for i in range(3):
+            row = []
             for j in range(3):
-                output += pad_img[i:i+img.shape[0], j:j+img.shape[1]] * k[i, j]
-        return output
+                idx = i * 3 + j
+                # Zamieniamy tekst na float (jeśli puste lub błąd, wstawiamy 0)
+                try:
+                    val = float(self.matrix_inputs[idx].text())
+                except ValueError:
+                    val = 0.0
+                row.append(val)
+            kernel.append(row)
+            
+        # Normalizacja własnej maski (opcjonalna, ale dobra praktyka, by obraz nie był za jasny/ciemny)
+        k_sum = np.sum(kernel)
+        if k_sum > 0:
+            kernel = [[v / k_sum for v in r] for r in kernel]
+            
+        return kernel
 
-    def convolve_2d(self, img_2d, kernel):
-        """Dodatkowa, zoptymalizowana funkcja do konwolucji na 1 kanale (dla Canny'ego)."""
-        k = np.array(kernel)
-        pad_img = np.pad(img_2d, ((1, 1), (1, 1)), mode='edge')
-        output = np.zeros_like(img_2d, dtype=np.float32)
+    # def update_blur_label(self, value):
+    #     self.blur_label.setText(f"Siła rozmycia (iteracje): {value}")
+    #     self.changed.emit()
+
+    # def update_sharp_label(self, value):
+    #     self.sharp_label.setText(f"Waga centralna (łagodność): {value}")
+    #     self.changed.emit()
+
+    def convolve(self, img, kernel):
+        k = np.array(kernel, dtype=np.float32)
         
-        for i in range(3):
-            for j in range(3):
-                output += pad_img[i:i+img_2d.shape[0], j:j+img_2d.shape[1]] * k[i, j]
+        if len(img.shape) == 3:
+           pad_width = ((1, 1), (1, 1), (0, 0))
+        else:
+            pad_width = ((1, 1), (1, 1))
+            
+        pad_img = np.pad(img, pad_width, mode='edge')
+        
+        windows = sliding_window_view(pad_img, window_shape=(3, 3), axis=(0, 1))
+        #output = np.tensordot(windows, k, axes=((2, 3), (0, 1)))
+        output = np.tensordot(windows, k, axes=((-2, -1), (0, 1)))
         return output
+
+    def usrednij(self, img):
+        tryb = self.blur_combo.currentText()
+        
+        if tryb == "Uśredniający (Zwykły)":
+            kernel = [[1/9, 1/9, 1/9], [1/9, 1/9, 1/9], [1/9, 1/9, 1/9]]
+            for _ in range(self.blur_slider.value()):
+                img = self.convolve(img, kernel)
+                
+        elif tryb == "Gaussa (Miękki)":
+            # Przybliżenie maski Gaussa (wagi z centrum na boki gasną)
+            kernel = [[1/16, 2/16, 1/16], 
+                      [2/16, 4/16, 2/16], 
+                      [1/16, 2/16, 1/16]]
+            for _ in range(self.blur_slider.value()):
+                img = self.convolve(img, kernel)
+                
+        elif tryb == "Własna macierz (Custom)":
+            kernel = self.get_custom_kernel()
+            # Własną macierz odpalamy tylko raz (ignorujemy slider iteracji)
+            img = self.convolve(img, kernel)
+            
+        return np.clip(img, 0, 255).astype(np.float32)
 
     def process(self, img):
         img_float = img.astype(np.float32)
 
-        # 1. Filtr uśredniający
         if self.blur_cb.isChecked():
-            kernel_blur = [[1/9, 1/9, 1/9], [1/9, 1/9, 1/9], [1/9, 1/9, 1/9]]
-            for _ in range(self.blur_slider.value()):
-                img_float = self.manual_convolve_3x3(img_float, kernel_blur)
+            img_float = self.usrednij(img_float)
 
-        # 2. Filtr wyostrzający
         if self.sharp_cb.isChecked():
             cw = self.sharp_slider.value()
             kernel_sharp = [[0, -1, 0], [-1, cw, -1], [0, -1, 0]]
             weight_sum = cw - 4
             if weight_sum > 0:
                 kernel_sharp = [[val / weight_sum for val in row] for row in kernel_sharp]
-            img_float = self.manual_convolve_3x3(img_float, kernel_sharp)
+            img_float = self.convolve(img_float, kernel_sharp)
 
         # 3. Wykrywanie Krawędzi
         if self.edge_cb.isChecked():
@@ -164,26 +191,26 @@ class Filtry(Zakladka):
             if wybrane == "Operator Sobela":
                 Gx = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
                 Gy = [[-1, -2, -1], [ 0,  0,  0], [ 1,  2,  1]]
-                img_x = self.manual_convolve_3x3(img_float, Gx)
-                img_y = self.manual_convolve_3x3(img_float, Gy)
+                img_x = self.convolve(img_float, Gx)
+                img_y = self.convolve(img_float, Gy)
                 img_float = np.sqrt(img_x**2 + img_y**2)
 
             elif wybrane == "Krzyż Robertsa":
                 Gx = [[ 0, 0,  0], [ 0, 1,  0], [ 0, 0, -1]]
                 Gy = [[ 0,  0, 0], [ 0,  0, 1], [ 0, -1, 0]]
-                img_x = self.manual_convolve_3x3(img_float, Gx)
-                img_y = self.manual_convolve_3x3(img_float, Gy)
+                img_x = self.convolve(img_float, Gx)
+                img_y = self.convolve(img_float, Gy)
                 img_float = np.sqrt(img_x**2 + img_y**2)
 
-            elif wybrane == "Algorytm Canny'ego (NumPy)":
+            elif wybrane == "Algorytm Canny'ego":
                 # KROK 1: Wyodrębnienie pojedynczego kanału 2D (dla wydajności)
                 gray_2d = img_float[:, :, 0] if len(img_float.shape) == 3 else img_float
 
                 # KROK 2: Gradienty (Sobel)
                 Gx = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
                 Gy = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
-                Ix = self.convolve_2d(gray_2d, Gx)
-                Iy = self.convolve_2d(gray_2d, Gy)
+                Ix = self.convolve(gray_2d, Gx)
+                Iy = self.convolve(gray_2d, Gy)
                 
                 # Amplituda i kierunek wektora
                 G = np.hypot(Ix, Iy)
@@ -220,7 +247,7 @@ class Filtry(Zakladka):
                 # KROK 5: Szybka histereza 
                 # Jeśli słaba krawędź dotyka mocnej (w promieniu 3x3), staje się mocną krawędzią
                 strong = (res == 255).astype(np.float32)
-                connected = self.convolve_2d(strong, np.ones((3,3)))
+                connected = self.convolve(strong, np.ones((3,3)))
                 res = np.where((res == 50) & (connected > 0), 255, res)
                 res[res == 50] = 0 # Odrzucamy resztę osamotnionych słabych krawędzi
                 

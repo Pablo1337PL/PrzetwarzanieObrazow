@@ -92,20 +92,4 @@ class PrzegladarkaObrazow(QGraphicsView):
             if 0 <= x < w and 0 <= y < h:
                 pixel = self.obecny_obraz_numpy[y, x]
                 self.pixel_hovered.emit(x, y, pixel)
-
-    def zapisz_obraz(self, parent_window):
-        if self.obecny_pixmap is None:
-            QMessageBox.warning(parent_window, "Brak obrazu", "Najpierw wczytaj zdjęcie!")
-            return
-            
-        file_path, _ = QFileDialog.getSaveFileName(
-            parent_window, 
-            "Zapisz obraz jako...", 
-            "", 
-            "Plik PNG (*.png);;Plik JPEG (*.jpg *.jpeg)"
-        )
-        
-        if file_path:
-            self.obecny_pixmap.save(file_path)
-            QMessageBox.information(parent_window, "Sukces", "Obraz zapisany pomyślnie!")
             
