@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-from PIL import Image
 import numpy as np
+from PIL import Image
 
 
 class ProcessWorker(QThread):
@@ -49,7 +49,7 @@ class LoadWorker(QThread):
 
             if obecne_piksele > docelowe_piksele:
                 stosunek = obecne_piksele / docelowe_piksele
-                skala = max(2, int(np.round(np.sqrt(stosunek))))
+                skala = max(1, int(np.round(np.sqrt(stosunek))))
                 img = img[::skala, ::skala, :]
 
             # 3. Wysyłamy gotowy obraz do interfejsu

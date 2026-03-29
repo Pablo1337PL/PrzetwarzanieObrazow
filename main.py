@@ -19,6 +19,7 @@ from filtry import Filtry
 from histogram import Histogram
 from projekcje import ProjekcjaGorna, ProjekcjaBoczna
 from metadane import Metadane
+from morfologia import Morfologia
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -149,14 +150,17 @@ class MainWindow(QWidget):
         
         self.tab_ekspozycja = Ekspozycja()
         self.tab_filtry = Filtry()
+        self.tab_morfologia = Morfologia()
         
-        # Odbieramy sygnały z zakładek i każemy przeliczyć podgląd na żywo
+        # Odbieramy sygnały z zakładek
         self.tab_ekspozycja.changed.connect(self.update_image_pipeline)
         self.tab_filtry.changed.connect(self.update_image_pipeline)
+        self.tab_morfologia.changed.connect(self.update_image_pipeline)
 
         self.tabs.addTab(self.tab_ekspozycja, "Ekspozycja")
         self.tabs.addTab(self.tab_filtry, "Filtry")
-
+        self.tabs.addTab(self.tab_morfologia, "Morfologia")
+        
         self.main_layout.addWidget(self.tabs, stretch=2)
 
     def load_image_dialog(self):
@@ -255,6 +259,7 @@ class MainWindow(QWidget):
         #  Nakładanie warstw (jak w Photoshopie/RawTherapee)
         img = self.tab_ekspozycja.return_processed_image(img)
         img = self.tab_filtry.return_processed_image(img)
+        img = self.tab_morfologia.return_processed_image(img)
         return img
 
     def update_image_pipeline(self):
