@@ -24,7 +24,7 @@ class Histogram(QWidget):
         self.plot_widget.setMouseEnabled(x=False, y=False)
         self.plot_widget.hideAxis('left') # Ukrywamy liczby na osi Y
         self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
-        self.plot_widget.setXRange(0, 255, padding=0)
+        self.plot_widget.setXRange(0, 256, padding=0)
         
         layout.addWidget(QLabel("<b>Histogram (RGB):</b>"))
         layout.addWidget(self.plot_widget)
@@ -42,14 +42,14 @@ class Histogram(QWidget):
             
         wartosci = np.atleast_1d(wartosc_piksela)
         
-        # Wskaźnik ma mieć 10% całkowitej wysokości wykresu
-        wysokosc_wskaznika = self.max_y * 0.05
+        
+        wysokosc_wskaznika = self.max_y * 0.07
         
         for i, line in enumerate(self.cursor_lines):
             if i < len(wartosci):
                 val = wartosci[i]
                 # W PyQtGraph po prostu zmieniamy dane linii
-                line.setData([val, val], [-wysokosc_wskaznika, wysokosc_wskaznika])
+                line.setData([val, val], [-wysokosc_wskaznika , wysokosc_wskaznika])
                 line.show() # Pokazujemy linię (domyślnie po resecie są ukryte)
 
     def update_histogram(self, img):
@@ -71,12 +71,12 @@ class Histogram(QWidget):
                 # Rysowanie linii i wypełnienia w PyQtGraph
                 pen = pg.mkPen(color=kolor, width=1.5)
                 # alpha 50 (z 255) dla przezroczystości wypełnienia
-                brush = pg.mkBrush(*kolor, 50) 
+                #brush = pg.mkBrush(*kolor, 50) 
                 
-                self.plot_widget.plot(x, hist, pen=pen, fillLevel=0, fillBrush=brush)
+                self.plot_widget.plot(x, hist, pen=pen) #, fillLevel=0, fillBrush=brush)
                 
                 # Tworzymy wskaźnik kursora (początkowo ukryty i wyzerowany)
-                cursor_pen = pg.mkPen(color=kolor, width=2.5)
+                cursor_pen = pg.mkPen(color=kolor, width=1.5)
                 cursor_line = self.plot_widget.plot([0, 0], [0, 0], pen=cursor_pen)
                 cursor_line.hide()
                 self.cursor_lines.append(cursor_line)
@@ -86,9 +86,9 @@ class Histogram(QWidget):
             
             szary = (100, 100, 100)
             pen = pg.mkPen(color=szary, width=2)
-            brush = pg.mkBrush(*szary, 80)
+            #brush = pg.mkBrush(*szary, 80)
             
-            self.plot_widget.plot(x, hist, pen=pen, fillLevel=0, fillBrush=brush)
+            self.plot_widget.plot(x, hist, pen=pen) #, fillLevel=0, fillBrush=brush)
             
             # Wskaźnik dla skali szarości (czerwony lub czarny)
             cursor_pen = pg.mkPen(color=(255, 0, 0), width=2.5)
@@ -97,4 +97,4 @@ class Histogram(QWidget):
             self.cursor_lines.append(cursor_line)
 
         # Dopasowujemy oś Y z lekkim marginesem na górze (5%)
-        self.plot_widget.setYRange(-1, self.max_y * 1.05, padding=0)
+        self.plot_widget.setYRange(0, self.max_y * 1.05, padding=0)

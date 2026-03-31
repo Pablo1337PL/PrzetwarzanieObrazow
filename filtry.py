@@ -10,35 +10,39 @@ from ui_helper import UIHelper
 class Filtry(Zakladka):
     def __init__(self):
         super().__init__(tytul_modulu="WŁĄCZ MODUŁ FILTRÓW", kolor="#e42b2b")
-# --- 1. FILTR UŚREDNIAJĄCY / KONWOLUCJA ---
+
+        # --- 1. FILTR / KONWOLUCJA ---
         self.blur_box = QFrame()
         self.blur_layout = QVBoxLayout(self.blur_box)
         self.blur_layout.setContentsMargins(0, 0, 0, 10) 
         
-        self.blur_cb = UIHelper.create_checkbox("Filtr / Konwolucja", default_state=False, toggled_func=self.changed.emit)
+        self.blur_cb = UIHelper.create_checkbox("Włącz Konwolucję", default_state=False, toggled_func=self.changed.emit)
         
         self.blur_label, self.blur_slider = UIHelper.create_labeled_slider(
             "Siła (iteracje)", 1, 5, 1, release_func=self.changed.emit
         )
 
-        # NOWOŚĆ: Wybór algorytmu
+        # NOWOŚĆ: Więcej filtrów
         self.blur_combo = UIHelper.create_combo_box(
-            ["Uśredniający (Zwykły)", "Gaussa (Miękki)", "Własna macierz (Custom)"], 
+            [
+                "Uśredniający (Zwykły)", 
+                "Gaussa (Miękki)", 
+                "Płaskorzeźba (Emboss)",
+                "Laplasjan (Detekcja Krawędzi)",
+                "Własna macierz (Custom)"
+            ], 
             changed_func=self.on_blur_mode_changed
         )
         
-        # NOWOŚĆ: Siatka 3x3 na własne wagi
-        # Domyślnie wpisujemy wagi dla np. płaskorzeźby (Emboss)
-        domyslne_wagi = [-2, -1, 0, -1, 1, 1, 0, 1, 2] 
+        # Inicjujemy siatkę (wagi nadpiszą się przy pierwszym uruchomieniu on_blur_mode_changed)
         self.matrix_grid, self.matrix_inputs = UIHelper.create_3x3_matrix_input(
-            domyslne_wagi, text_changed_func=self.changed.emit
+            [0]*9, text_changed_func=self.on_custom_matrix_edited
         )
         
-        # Zamykamy siatkę w dodatkowym widgecie, żeby łatwo ją chować/pokazywać
+        # Macierz jest teraz ZAWSZE widoczna
         self.matrix_widget = QWidget()
         self.matrix_widget.setLayout(self.matrix_grid)
-        self.matrix_widget.hide() # Domyślnie ukryta (bo domyślnie jest tryb Zwykły)
-
+        
         self.blur_layout.addWidget(self.blur_cb)
         self.blur_layout.addWidget(self.blur_combo)
         self.blur_layout.addWidget(self.blur_label)
@@ -82,17 +86,49 @@ class Filtry(Zakladka):
         UIHelper.add_separator(self.layout)
         self.layout.addWidget(self.edge_box)
 
+        # Inicjalizacja domyślnych wartości w siatce
+        self.on_blur_mode_changed()
+
     # --- FUNKCJE POMOCNICZE UI ---
 
+    def set_matrix_values(self, flat_list):
+        """Aktualizuje tekst w 9 okienkach na podstawie przekazanej płaskiej listy."""
+        # Odłączamy na chwilę sygnały, żeby zmiana tekstu nie odpaliła on_custom_matrix_edited
+        for inp in self.matrix_inputs:
+            inp.blockSignals(True)
+            
+        for i, val in enumerate(flat_list):
+            # Formatujemy liczby, pozbywając się niepotrzebnych zer po przecinku (np. 0.11 zamiast 0.11111)
+            formatted_val = f"{val:.3g}"
+            self.matrix_inputs[i].setText(formatted_val)
+            
+        for inp in self.matrix_inputs:
+            inp.blockSignals(False)
 
     def on_blur_mode_changed(self):
-        """Pokazuje siatkę 3x3 tylko wtedy, gdy wybrano tryb 'Własna macierz'."""
-        if self.blur_combo.currentText() == "Własna macierz (Custom)":
-            self.matrix_widget.show()
-            self.blur_slider.setEnabled(False) # Przy własnej masce nie powielamy iteracji (suwaka)
-        else:
-            self.matrix_widget.hide()
-            self.blur_slider.setEnabled(True)
+        """Ustawia wagi w siatce w zależności od wybranego gotowego filtru."""
+        tryb = self.blur_combo.currentText()
+        
+        if tryb == "Uśredniający (Zwykły)":
+            self.set_matrix_values([1/9]*9)
+        elif tryb == "Gaussa (Miękki)":
+            self.set_matrix_values([1/16, 2/16, 1/16, 2/16, 4/16, 2/16, 1/16, 2/16, 1/16])
+        elif tryb == "Płaskorzeźba (Emboss)":
+            self.set_matrix_values([-2, -1, 0, -1, 1, 1, 0, 1, 2])
+        elif tryb == "Laplasjan (Detekcja Krawędzi)":
+            self.set_matrix_values([0, 1, 0, 1, -4, 1, 0, 1, 0])
+            
+        self.changed.emit()
+
+    def on_custom_matrix_edited(self):
+        """Zmienia tryb na Custom, jeśli użytkownik zacznie edytować okienka."""
+        if self.blur_combo.currentText() != "Własna macierz (Custom)":
+            # Blokujemy sygnał combo-boxa na chwilę, żeby nie nadpisał nam edytowanej macierzy
+            self.blur_combo.blockSignals(True)
+            # Ustawiamy index na "Własna macierz (Custom)" (to ostatni element, index 4)
+            self.blur_combo.setCurrentIndex(4) 
+            self.blur_combo.blockSignals(False)
+            
         self.changed.emit()
 
     def get_custom_kernel(self):
@@ -102,7 +138,6 @@ class Filtry(Zakladka):
             row = []
             for j in range(3):
                 idx = i * 3 + j
-                # Zamieniamy tekst na float (jeśli puste lub błąd, wstawiamy 0)
                 try:
                     val = float(self.matrix_inputs[idx].text())
                 except ValueError:
@@ -110,20 +145,9 @@ class Filtry(Zakladka):
                 row.append(val)
             kernel.append(row)
             
-        # Normalizacja własnej maski (opcjonalna, ale dobra praktyka, by obraz nie był za jasny/ciemny)
-        k_sum = np.sum(kernel)
-        if k_sum > 0:
-            kernel = [[v / k_sum for v in r] for r in kernel]
-            
         return kernel
 
-    # def update_blur_label(self, value):
-    #     self.blur_label.setText(f"Siła rozmycia (iteracje): {value}")
-    #     self.changed.emit()
-
-    # def update_sharp_label(self, value):
-    #     self.sharp_label.setText(f"Waga centralna (łagodność): {value}")
-    #     self.changed.emit()
+    # --- LOGIKA PRZETWARZANIA ---
 
     def convolve(self, img, kernel):
         k = np.array(kernel, dtype=np.float32)
@@ -136,32 +160,23 @@ class Filtry(Zakladka):
         pad_img = np.pad(img, pad_width, mode='edge')
         
         windows = sliding_window_view(pad_img, window_shape=(3, 3), axis=(0, 1))
-        #output = np.tensordot(windows, k, axes=((2, 3), (0, 1)))
         output = np.tensordot(windows, k, axes=((-2, -1), (0, 1)))
         return output
 
     def usrednij(self, img):
-        tryb = self.blur_combo.currentText()
+        kernel = self.get_custom_kernel()
+        kernel_np = np.array(kernel, dtype=np.float32)
         
-        if tryb == "Uśredniający (Zwykły)":
-            kernel = [[1/9, 1/9, 1/9], [1/9, 1/9, 1/9], [1/9, 1/9, 1/9]]
-            for _ in range(self.blur_slider.value()):
-                img = self.convolve(img, kernel)
-                
-        elif tryb == "Gaussa (Miękki)":
-            # Przybliżenie maski Gaussa (wagi z centrum na boki gasną)
-            kernel = [[1/16, 2/16, 1/16], 
-                      [2/16, 4/16, 2/16], 
-                      [1/16, 2/16, 1/16]]
-            for _ in range(self.blur_slider.value()):
-                img = self.convolve(img, kernel)
-                
-        elif tryb == "Własna macierz (Custom)":
-            kernel = self.get_custom_kernel()
-            # Własną macierz odpalamy tylko raz (ignorujemy slider iteracji)
-            img = self.convolve(img, kernel)
+        suma_wag = np.sum(kernel_np)
+        
+        if suma_wag != 0:
+            kernel_np = kernel_np / suma_wag
+        
+        for _ in range(self.blur_slider.value()):
+            img = self.convolve(img, kernel_np)
             
         return np.clip(img, 0, 255).astype(np.float32)
+    
 
     def process(self, img):
         img_float = img.astype(np.float32)
@@ -179,8 +194,6 @@ class Filtry(Zakladka):
 
         # 3. Wykrywanie Krawędzi
         if self.edge_cb.isChecked():
-            
-            # Wymuszenie szarości - realizacja Twojego pomysłu
             if self.edge_gray_cb.isChecked() and len(img_float.shape) == 3:
                 R, G, B = img_float[:, :, 0], img_float[:, :, 1], img_float[:, :, 2]
                 szary = 0.299 * R + 0.587 * G + 0.114 * B

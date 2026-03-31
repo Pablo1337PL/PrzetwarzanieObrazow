@@ -36,7 +36,7 @@ class UIHelper:
     @staticmethod
     def create_labeled_slider(prefix_text, min_val, max_val, default, release_func=None):
         """
-        COŚ OD SIEBIE: Generuje etykietę i suwak. 
+        Generuje etykietę i suwak. 
         Automatycznie łączy je ze sobą, aby etykieta aktualizowała się sama w czasie rzeczywistym!
         Zwraca krotkę: (QLabel, QSlider)
         """

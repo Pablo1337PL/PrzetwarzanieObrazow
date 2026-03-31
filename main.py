@@ -1,4 +1,4 @@
-import sys
+import sys, os
 import numpy as np
 
 from PIL import Image
@@ -33,6 +33,17 @@ class MainWindow(QWidget):
         self.setup_left_panel()
         self.setup_center_panel()
         self.setup_right_panel()
+
+        self.file_path = os.path.join("obrazki", "grzyb.jpg")
+        self.btn_load.setEnabled(False)
+        self.btn_load.setText("Wczytywanie...")
+
+        # Tworzymy i uruchamiamy wątek w tle
+        self.load_thread = LoadWorker(self.file_path)
+        self.load_thread.success.connect(self.on_load_success)
+        self.load_thread.error.connect(self.on_load_error)
+        
+        self.load_thread.start()
     
     def add_separator(self, layout):
         line = QFrame()

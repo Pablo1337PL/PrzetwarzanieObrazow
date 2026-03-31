@@ -44,12 +44,14 @@ class LoadWorker(QThread):
             img = np.array(pil_img)
 
             # 2. Błyskawiczna optymalizacja wielkości do ~720p
+            # 720×480 = 345_600
+            # 1280×720 = 921_600
             docelowe_piksele = 921_600
             obecne_piksele = img.shape[1] * img.shape[0]
 
             if obecne_piksele > docelowe_piksele:
                 stosunek = obecne_piksele / docelowe_piksele
-                skala = max(1, int(np.round(np.sqrt(stosunek))))
+                skala = max(2, int(np.round(np.sqrt(stosunek))))
                 img = img[::skala, ::skala, :]
 
             # 3. Wysyłamy gotowy obraz do interfejsu
