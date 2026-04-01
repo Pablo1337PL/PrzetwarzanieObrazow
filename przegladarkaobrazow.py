@@ -6,7 +6,6 @@ from PyQt5.QtCore import Qt, pyqtSignal
 class PrzegladarkaObrazow(QGraphicsView):
     pixel_hovered = pyqtSignal(int, int, object)
     
-    # NOWY SYGNAŁ: Wysyła parametry widocznego okna (x, y, szerokość, wysokość)
     visible_rect_changed = pyqtSignal(int, int, int, int)
 
     def __init__(self):
@@ -23,8 +22,6 @@ class PrzegladarkaObrazow(QGraphicsView):
         self.obecny_pixmap = None
         self.obecny_obraz_numpy = None
 
-        # Kiedy przesuwamy obrazek (Pan), paski przewijania zmieniają wartość.
-        # Łapiemy to i przeliczamy widoczny obszar!
         self.horizontalScrollBar().valueChanged.connect(self.emit_visible_rect)
         self.verticalScrollBar().valueChanged.connect(self.emit_visible_rect)
 
@@ -43,7 +40,6 @@ class PrzegladarkaObrazow(QGraphicsView):
 
         self.scale(zoom_factor, zoom_factor)
         
-        # Po zoomie, wyślij nowe kordynaty widocznego obszaru
         self.emit_visible_rect()
 
     def wyswietl_obraz_numpy(self, img_array):
@@ -60,7 +56,6 @@ class PrzegladarkaObrazow(QGraphicsView):
         self.scene.addPixmap(self.obecny_pixmap)
         self.setSceneRect(self.scene.itemsBoundingRect())
         
-        # Wyślij sygnał od razu po załadowaniu nowego zdjęcia
         self.emit_visible_rect()
 
     def emit_visible_rect(self):
@@ -68,11 +63,9 @@ class PrzegladarkaObrazow(QGraphicsView):
         if self.obecny_pixmap is None or self.obecny_obraz_numpy is None:
             return
             
-        # Pobieramy prostokąt z widoku i mapujemy go na koordynaty obrazka
         rect = self.mapToScene(self.viewport().rect()).boundingRect()
         img_rect = self.scene.itemsBoundingRect()
         
-        # Ucinamy to, co wystaje poza obrazek (np. szare tło aplikacji)
         rect = rect.intersected(img_rect)
 
         x = int(max(0, rect.x()))
@@ -92,4 +85,3 @@ class PrzegladarkaObrazow(QGraphicsView):
             if 0 <= x < w and 0 <= y < h:
                 pixel = self.obecny_obraz_numpy[y, x]
                 self.pixel_hovered.emit(x, y, pixel)
-            

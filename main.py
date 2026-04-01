@@ -38,7 +38,6 @@ class MainWindow(QWidget):
         self.btn_load.setEnabled(False)
         self.btn_load.setText("Wczytywanie...")
 
-        # Tworzymy i uruchamiamy wątek w tle
         self.load_thread = LoadWorker(self.file_path)
         self.load_thread.success.connect(self.on_load_success)
         self.load_thread.error.connect(self.on_load_error)
@@ -100,7 +99,6 @@ class MainWindow(QWidget):
     def setup_center_panel(self):   
         center_layout = QVBoxLayout()
 
-        # --- SIATKA (GRID) DLA OBRAZU I PROJEKCJI ---
         self.grid = QGridLayout()
         self.grid.setSpacing(0) 
 
@@ -115,19 +113,15 @@ class MainWindow(QWidget):
         self.grid.setColumnStretch(1, 1)
         self.grid.setRowStretch(1, 1)
 
-        # Na starcie aplikujemy stany z checkboxów (ukrywamy projekcje)
         self.toggle_projections()
 
         center_layout.addLayout(self.grid)
 
-        # --- NASŁUCHIWANIE RUCHU MYSZKĄ ---
         self.przegladarka.pixel_hovered.connect(self.on_pixel_hovered)
-        # --- NASŁUCHIWANIE RUCHU I ZMIANY WIDOKU ---
         self.przegladarka.pixel_hovered.connect(self.on_pixel_hovered)
         self.przegladarka.visible_rect_changed.connect(self.update_projections_from_rect)
 
 
-        # --- PRZYCISKI PLIKÓW ---
         self.btn_load = QPushButton("Wczytaj zdjęcie")
         self.btn_load.clicked.connect(self.load_image_dialog)
         self.btn_save = QPushButton("Zapisz obraz")
@@ -141,13 +135,11 @@ class MainWindow(QWidget):
         self.main_layout.addLayout(center_layout, stretch=6)
 
     
-    # NOWA FUNKCJA - Włączanie/wyłączanie wykresów
     def toggle_projections(self):
         """Pokazuje/ukrywa projekcje, dynamicznie zwalniając miejsce na ekranie."""
         self.proj_gora.setVisible(self.chk_proj_gora.isChecked())
         self.proj_boczna.setVisible(self.chk_proj_lewo.isChecked())
 
-    # NOWA FUNKCJA - Przesuwanie linii na wykresach
     def on_pixel_hovered(self, x, y, piksel):
         # Przekazujemy całą tablicę [R, G, B] prosto do histogramu
         self.histogram.set_cursor(piksel) 
@@ -163,7 +155,6 @@ class MainWindow(QWidget):
         self.tab_filtry = Filtry()
         self.tab_morfologia = Morfologia()
         
-        # Odbieramy sygnały z zakładek
         self.tab_ekspozycja.changed.connect(self.update_image_pipeline)
         self.tab_filtry.changed.connect(self.update_image_pipeline)
         self.tab_morfologia.changed.connect(self.update_image_pipeline)
@@ -180,33 +171,25 @@ class MainWindow(QWidget):
         )
         
         if file_path:
-            # Zapisujemy ścieżkę (przyda się później do zapisu pełnej rozdzielczości!)
             self.file_path = file_path
 
-            # UX: Blokujemy przycisk i informujemy użytkownika, że pracujemy
             self.btn_load.setEnabled(False)
             self.btn_load.setText("Wczytywanie...")
 
-            # Tworzymy i uruchamiamy wątek w tle
             self.load_thread = LoadWorker(self.file_path)
             self.load_thread.success.connect(self.on_load_success)
             self.load_thread.error.connect(self.on_load_error)
             
             self.load_thread.start()
 
-    # --- FUNKCJE ODBIERAJĄCE SYGNAŁY Z WĄTKU ---
-
     def on_load_success(self, img_array):
         """Odbiera przeliczoną macierz NumPy i puszcza ją w potok."""
-        # Odblokowujemy przycisk
         self.btn_load.setEnabled(True)
         self.btn_load.setText("Wczytaj zdjęcie")
 
-        # Aktualizujemy widget metadanych (bardzo szybka operacja, może być w głównym wątku)
         if hasattr(self, 'metadane'):
             self.metadane.wczytaj_dane(self.file_path)
 
-        # Zapisujemy obraz i odpalamy potok filtrów
         self.original_image = img_array
         self.update_image_pipeline()
 
@@ -237,21 +220,15 @@ class MainWindow(QWidget):
             elif "JPEG" in selected_filter:
                 save_path += ".jpg"
 
-        # SUPER TRIK UX: Blokujemy przycisk na czas zapisu i zmieniamy mu tekst
         self.btn_save.setEnabled(False)
         self.btn_save.setText("Zapisywanie...")
 
-        # Tworzymy osobny wątek, przekazując mu ścieżki i funkcję do przetwarzania
         self.save_thread = SaveWorker(self.file_path, save_path, self.process_image)
         
-        # Podłączamy sygnały z wątku do naszych funkcji w głównym oknie
         self.save_thread.success.connect(self.on_save_success)
         self.save_thread.error.connect(self.on_save_error)
         
-        # Uruchamiamy wątek w tle! (Interfejs GUI pozostaje w 100% responsywny)
         self.save_thread.start()
-
-    # --- FUNKCJE ODBIERAJĄCE SYGNAŁY Z WĄTKU (Działają w głównym wątku GUI) ---
 
     def on_save_success(self):
         """Wywoływane, gdy wątek zaraportuje sukces."""
@@ -267,7 +244,6 @@ class MainWindow(QWidget):
 
 
     def process_image(self, img):
-        #  Nakładanie warstw (jak w Photoshopie/RawTherapee)
         img = self.tab_ekspozycja.return_processed_image(img)
         img = self.tab_filtry.return_processed_image(img)
         img = self.tab_morfologia.return_processed_image(img)
@@ -278,47 +254,35 @@ class MainWindow(QWidget):
         if getattr(self, 'original_image', None) is None:
             return
 
-        # ZABICIE STAREGO WĄTKU (jeśli użytkownik ciągle rusza suwakiem)
         if hasattr(self, 'process_thread') and self.process_thread.isRunning():
             self.process_thread.is_cancelled = True
             self.process_thread.wait() # Czekamy ułamek sekundy na zakończenie
 
-        # Pracujemy na kopii oryginału
         img_copy = self.original_image.copy()
 
-        # Tworzymy i uruchamiamy wątek (przekazujemy mu funkcję process_image)
         self.process_thread = ProcessWorker(img_copy, self.process_image)
         self.process_thread.finished_signal.connect(self.on_processing_finished)
         self.process_thread.start()
 
     def on_processing_finished(self, processed_img):
         """Ta funkcja wywołuje się automatycznie, gdy wątek skończy liczyć."""
-        # Aktualizujemy główną zmienną
         self.current_processed_image = processed_img
 
-        # 1. Wyświetlamy obraz w przeglądarce
         self.przegladarka.wyswietl_obraz_numpy(processed_img)
 
-        # 2. Aktualizujemy histogram
         self.histogram.update_histogram(processed_img)
         
-        # Opcjonalnie: jeśli masz włączone projekcje, tutaj je zaktualizuj
-        # np. self.proj_gora.update_plot(processed_img)
-
     def update_projections_from_rect(self, x, y, w, h):
         """Odbiera koordynaty z przeglądarki i aktualizuje projekcje tylko dla widocznego fragmentu."""
         if not hasattr(self, 'current_processed_image') or self.current_processed_image is None:
             return
             
-        # Zapisujemy koordynaty wycięcia, aby poprawić wskaźnik kursora
         self.current_crop_x = x
         self.current_crop_y = y
 
-        # Magia NumPy: wycinamy błyskawicznie tylko widoczny obszar
         widoczny_fragment = self.current_processed_image[y:y+h, x:x+w]
         tryb_rgb = self.chk_proj_rgb.isChecked()
 
-        # Aktualizujemy wykresy (dla optymalizacji - tylko te, które są widoczne)
         if self.chk_proj_gora.isChecked():
             self.proj_gora.update_plot(widoczny_fragment, rgb_mode=tryb_rgb)
         if self.chk_proj_lewo.isChecked():
@@ -327,9 +291,6 @@ class MainWindow(QWidget):
     def on_pixel_hovered(self, x, y, piksel):
         self.histogram.set_cursor(piksel)
         
-        # Kursor myszki podaje bezwzględną pozycję piksela (np. x=1500)
-        # Ale nasz wykres wyświetla tylko wycinek od x=1000. 
-        # Zatem dla wykresu kursor jest na pozycji 500.
         rel_x = x - getattr(self, 'current_crop_x', 0)
         rel_y = y - getattr(self, 'current_crop_y', 0)
 

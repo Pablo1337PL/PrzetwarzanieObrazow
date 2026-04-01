@@ -11,25 +11,22 @@ class ProjekcjaGorna(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Ustawienia kolorystyki PyQtGraph, aby pasowała do reszty aplikacji
         pg.setConfigOption('background', 'w')
         pg.setConfigOption('foreground', 'k')
         pg.setConfigOptions(antialias=True)
         
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setMouseEnabled(x=False, y=False)
-        self.plot_widget.hideAxis('left') # Ukrywamy liczby na osi Y
+        self.plot_widget.hideAxis('left')
         self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
         
         layout.addWidget(self.plot_widget)
         
-        # Nieskończona pionowa linia kursora (domyślnie ukryta)
         self.cursor_line = pg.InfiniteLine(angle=90, pen=pg.mkPen(color='r', style=Qt.DashLine, width=1.5))
         self.cursor_line.hide()
         self.plot_widget.addItem(self.cursor_line)
 
     def update_plot(self, img, rgb_mode=False):
-        # Czyścimy wykres, ale zachowujemy linię kursora
         self.plot_widget.clear()
         self.plot_widget.addItem(self.cursor_line)
         
@@ -73,12 +70,10 @@ class ProjekcjaBoczna(QWidget):
         self.plot_widget.hideAxis('bottom') # Ukrywamy liczby na osi X
         self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
         
-        # Kluczowe: Odwracamy oś Y, aby punkt 0 był na górze (jak na zdjęciu)
         self.plot_widget.getViewBox().invertY(True)
         
         layout.addWidget(self.plot_widget)
         
-        # Pozioma linia kursora (angle=0)
         self.cursor_line = pg.InfiniteLine(angle=0, pen=pg.mkPen(color='r', style=Qt.DashLine, width=1.5))
         self.cursor_line.hide()
         self.plot_widget.addItem(self.cursor_line)
@@ -90,7 +85,6 @@ class ProjekcjaBoczna(QWidget):
         wysokosc = img.shape[0]
         y_vals = np.arange(wysokosc)
         
-        # Pusta krzywa (zero na osi X) do narysowania horyzontalnego wypełnienia
         zero_curve = pg.PlotCurveItem([0] * wysokosc, y_vals)
 
         if rgb_mode and len(img.shape) == 3 and img.shape[2] >= 3:
@@ -101,9 +95,7 @@ class ProjekcjaBoczna(QWidget):
                 pen = pg.mkPen(color=kolor, width=1.5)
                 brush = pg.mkBrush(*kolor, 50)
                 
-                # Rysujemy linię (X = wartość, Y = wiersz)
                 data_curve = pg.PlotCurveItem(proj, y_vals, pen=pen)
-                # Wypełniamy pomiędzy naszą linią a zerem
                 fill = pg.FillBetweenItem(data_curve, zero_curve, brush=brush)
                 
                 self.plot_widget.addItem(data_curve)
@@ -112,7 +104,6 @@ class ProjekcjaBoczna(QWidget):
             gray = np.mean(img, axis=2) if len(img.shape) == 3 else img
             proj = np.sum(gray, axis=1) 
             
-            # Kolor morski (#449988) dla skali szarości
             morski = (68, 153, 136)
             pen = pg.mkPen(color=morski, width=1.5)
             brush = pg.mkBrush(*morski, 80)
