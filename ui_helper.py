@@ -46,10 +46,8 @@ class UIHelper:
         slider.setRange(min_val, max_val)
         slider.setValue(default)
         
-        # Automatyczna aktualizacja tekstu etykiety (nie musisz pisać do tego osobnych metod w klasie!)
         slider.valueChanged.connect(lambda v: label.setText(f"{prefix_text}: {v}"))
         
-        # Obliczenia odpalamy dopiero po puszczeniu suwaka (optymalizacja!)
         if release_func:
             slider.sliderReleased.connect(release_func)
             
@@ -73,9 +71,8 @@ class UIHelper:
         grid = QGridLayout()
         grid.setSpacing(5)
         
-        # Ograniczamy wpisywanie tylko do liczb (całkowitych i ułamkowych)
         validator = QDoubleValidator()
-        validator.setLocale(QLocale(QLocale.C)) # Żeby kropka działała jako separator dziesiętny
+        validator.setLocale(QLocale(QLocale.C))
         
         inputs = []
         for i in range(3):
@@ -84,7 +81,7 @@ class UIHelper:
                 line_edit = QLineEdit(str(default_values[idx]))
                 line_edit.setValidator(validator)
                 line_edit.setAlignment(Qt.AlignCenter)
-                line_edit.setFixedWidth(40) # Wąskie okienka, żeby wyglądało jak macierz
+                line_edit.setFixedWidth(40)
                 
                 if text_changed_func:
                     line_edit.editingFinished.connect(text_changed_func)

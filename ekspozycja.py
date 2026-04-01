@@ -8,14 +8,12 @@ class Ekspozycja(Zakladka):
     def __init__(self):
         super().__init__(tytul_modulu="MODUŁ EKSPOZYCJI", kolor="#2b78e4")
 
-        # --- 0. WYRÓWNYWANIE HISTOGRAMU ---
         self.hist_eq_cb = QCheckBox("Wyrównaj histogram")
         self.hist_eq_cb.toggled.connect(self.changed.emit)
         self.layout.addWidget(self.hist_eq_cb)
         
         self.add_separator()
 
-        # --- 1. KONWERSJA DO SZAROŚCI ---
         self.szarosc_cb = QCheckBox("Odcienie szarości")
         self.szarosc_combo = QComboBox()
         self.szarosc_combo.addItems(["Luminancja", "Średnia", "Maksymalna"])
@@ -26,14 +24,12 @@ class Ekspozycja(Zakladka):
         self.layout.addWidget(self.szarosc_cb)
         self.layout.addWidget(self.szarosc_combo)
 
-        # --- 2. NEGATYW ---
         self.negatyw_cb = QCheckBox("Negatyw")
         self.negatyw_cb.toggled.connect(self.changed.emit)
         self.layout.addWidget(self.negatyw_cb)
 
         self.add_separator()
 
-        # --- 3. JASNOŚĆ ---
         self.jasnosc_cb = QCheckBox("Jasność")
         self.jasnosc_cb.toggled.connect(self.changed.emit)
         self.jasnosc_label = QLabel("Wartość: 0")
@@ -42,7 +38,6 @@ class Ekspozycja(Zakladka):
         self.layout.addWidget(self.jasnosc_label)
         self.layout.addWidget(self.jasnosc_slider)
 
-        # --- 4. KONTRAST ---
         self.kontrast_cb = QCheckBox("Kontrast")
         self.kontrast_cb.toggled.connect(self.changed.emit)
         self.kontrast_label = QLabel("Wartość: 0")
@@ -51,7 +46,6 @@ class Ekspozycja(Zakladka):
         self.layout.addWidget(self.kontrast_label)
         self.layout.addWidget(self.kontrast_slider)
 
-        # --- 5. SATURACJA ---
         self.saturacja_cb = QCheckBox("Saturacja")
         self.saturacja_cb.toggled.connect(self.changed.emit)
         self.saturacja_label = QLabel("Wartość: 0")
@@ -60,7 +54,6 @@ class Ekspozycja(Zakladka):
         self.layout.addWidget(self.saturacja_label)
         self.layout.addWidget(self.saturacja_slider)
 
-        # --- 6. WINIETA ---
         self.winieta_cb = QCheckBox("Winieta")
         self.winieta_cb.toggled.connect(self.changed.emit)
         self.winieta_label = QLabel("Siła winiety: 0")
@@ -71,7 +64,6 @@ class Ekspozycja(Zakladka):
         
         self.add_separator()
 
-        # --- 7. BINARYZACJA ---
         self.bin_layout = QHBoxLayout() 
         
         self.bin_cb = QCheckBox("Binaryzacja")
@@ -91,8 +83,6 @@ class Ekspozycja(Zakladka):
         self.layout.addWidget(self.bin_label)
         self.layout.addWidget(self.bin_slider)
 
-    # --- FUNKCJE POMOCNICZE UI ---
-    
     def create_slider(self, min_val, max_val, default, connect_func):
         slider = QSlider(Qt.Horizontal)
         slider.setRange(min_val, max_val)
@@ -120,15 +110,12 @@ class Ekspozycja(Zakladka):
         self.winieta_label.setText(f"Siła winiety: {self.winieta_slider.value()}")
 
     def update_bin(self):
-        # TUTAJ JEST ZMIANA:
         # Kiedy użytkownik rusz suwakiem, sprawdzamy, czy Otsu jest zaznaczone.
         # Jeśli tak - odznaczamy je automatycznie.
         if self.bin_otsu_cb.isChecked():
             self.bin_otsu_cb.setChecked(False)
             
         self.bin_label.setText(f"Próg odcięcia: {self.bin_slider.value()}")
-
-    # --- GŁÓWNA FUNKCJA PRZETWARZANIA ---
 
     def process(self, img):
         img_float = img.astype(np.float32)

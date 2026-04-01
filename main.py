@@ -62,7 +62,7 @@ class MainWindow(QWidget):
         # 2. Opcje projekcji
 
         projekcje_layout = QVBoxLayout()
-        projekcje_layout.setAlignment(Qt.AlignTop) # Trzyma elementy na górze swojej części
+        projekcje_layout.setAlignment(Qt.AlignTop)
         
         projekcje_layout.addWidget(QLabel("<b>Sterowanie Projekcjami:</b>"))
         
@@ -76,7 +76,6 @@ class MainWindow(QWidget):
 
         self.chk_proj_rgb = QCheckBox("Projekcje w kolorach RGB")
         self.chk_proj_rgb.setChecked(False)
-        # Zmiana trybu RGB odświeża od razu widok
         self.chk_proj_rgb.toggled.connect(self.update_image_pipeline) 
 
         projekcje_layout.addWidget(self.chk_proj_gora)
